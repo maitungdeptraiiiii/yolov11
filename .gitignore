@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.log
+models/*.pth
+models/history.json
+models/val_predictions_epoch*.json
+models/val_score_epoch*.json
+models/threshold_tuning/
+models/threshold_tuning.json
+predictions.json
+val_predictions.json
+val_score.json
