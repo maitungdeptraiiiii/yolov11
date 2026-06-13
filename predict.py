@@ -1,5 +1,7 @@
 import argparse
+import os
 from pathlib import Path
+from urllib.request import urlopen
 
 import torch
 from tqdm import tqdm
@@ -9,11 +11,19 @@ from utils.data import DEFAULT_CLASSES
 from utils.inference import predict_image, save_predictions
 
 
+DEFAULT_CHECKPOINT_URL = "https://github.com/maitungdeptraiiiii/yolov11/releases/download/v1.0.0/best.pth"
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Run inference with the custom YOLO-style object detector.")
     parser.add_argument("--image_dir", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--checkpoint", default="./models/best.pth")
+    parser.add_argument(
+        "--checkpoint_url",
+        default=None,
+        help="Download URL used when --checkpoint is missing. Defaults to CHECKPOINT_URL or the GitHub release asset.",
+    )
     parser.add_argument("--img_size", type=int, default=960)
     parser.add_argument("--conf_threshold", type=float, default=None)
     parser.add_argument("--iou_threshold", type=float, default=None)
@@ -34,7 +44,41 @@ def parse_args():
     return parser.parse_args()
 
 
+def ensure_checkpoint(checkpoint_path, checkpoint_url=None):
+    checkpoint_path = Path(checkpoint_path)
+    if checkpoint_path.exists():
+        return checkpoint_path
+
+    url = checkpoint_url or os.environ.get("CHECKPOINT_URL") or DEFAULT_CHECKPOINT_URL
+    if not url:
+        raise FileNotFoundError(
+            f"Checkpoint not found at {checkpoint_path}. Provide --checkpoint, --checkpoint_url, or CHECKPOINT_URL."
+        )
+
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = checkpoint_path.with_suffix(checkpoint_path.suffix + ".download")
+    print(f"Checkpoint not found at {checkpoint_path}. Downloading from {url}...")
+    try:
+        with urlopen(url) as response, tmp_path.open("wb") as output_file:
+            total = response.headers.get("Content-Length")
+            total = int(total) if total and total.isdigit() else None
+            with tqdm(total=total, unit="B", unit_scale=True, desc="checkpoint") as progress:
+                while True:
+                    chunk = response.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    output_file.write(chunk)
+                    progress.update(len(chunk))
+        tmp_path.replace(checkpoint_path)
+    except Exception:
+        if tmp_path.exists():
+            tmp_path.unlink()
+        raise
+    return checkpoint_path
+
+
 def load_model(args):
+    args.checkpoint = str(ensure_checkpoint(args.checkpoint, args.checkpoint_url))
     checkpoint = torch.load(args.checkpoint, map_location=args.device)
     classes = checkpoint.get("classes", DEFAULT_CLASSES)
     saved_args = checkpoint.get("args", {})

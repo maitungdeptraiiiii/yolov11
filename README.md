@@ -158,6 +158,14 @@ By default, `predict.py` loads:
 ./models/best.pth
 ```
 
+If this file is missing, `predict.py` automatically downloads the checkpoint from the public GitHub Release asset:
+
+```text
+https://github.com/maitungdeptraiiiii/yolov11/releases/download/v1.0.0/best.pth
+```
+
+You can override the download URL with `--checkpoint_url` or the `CHECKPOINT_URL` environment variable.
+
 Use a custom checkpoint if needed:
 
 ```bash
